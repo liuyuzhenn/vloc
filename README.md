@@ -1,0 +1,2 @@
+# vloc
+Visual localization project.
