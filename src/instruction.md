@@ -1,68 +1,30 @@
-# Import Matches to Colmap
+# Reconstruction
 
-
-**Directory organization**
-
-Images should be put in the `img` folder. 
-During reconstruction, the following directories will be generated: 
-`patches`, `descriptors`, `keypoints`, `matches`, `sparse`; 
-the following files will be generated `database.db`, `image-pairs.txt`, `log.txt`, `result.txt`
-
-An example is shown below:
-
-```
-data
-├─scene1 (root_dir for scene1)
-│   └─img
-│      ├─img1.jpg
-│      ├─img2.jpg
-│      └─img3.jpg
-├─scene2 (root_dir for scene2)
-│   └─img
-│      ├─img1.jpg
-│      ├─img2.jpg
-│      └─img3.jpg
-...
-```
-
-## Reconstruction
+## Usage
 
 ```py
-python ./src/reconstruct.py --colmap_path /path/to/colmap --root_dir /path/to/root_dir --device 0
+python ./src/reconstruct.py --colmap_path /path/to/colmap --work_space /path/to/work_space --img_dir /path/to/image_folder
 ```
+*e.g.*
+
+```
+python ./src/reconstruct.py --colmap_path E:/software/COLMAP-3.7-windows-cuda/COLMAP.bat --work_space data\Fort_Channing_gate  --img_dir  data\Fort_Channing_gate\img
+```
+
+During reconstruction, the following files will be generated `database.db`, `image-pairs.txt`, `log.txt`, `result.txt`
 
 Once the reconstruction is done, the structure looks like this (* denotes the generated folders/files): 
 ```
-data
-├─scene1 (root_dir for scene1)
-│   ├─patches *
-│   ├─descriptors *
-│   ├─keypoints *
-│   ├─matches *
-│   ├─sparse *
-│   │   └─0 *
-│   ├─image-pairs.txt *
-│   ├─database.db *
-│   ├─log.txt *
-│   ├─result.txt *
-│   └─img
-│      ├─img1.jpg
-│      ├─img2.jpg
-│      └─img3.jpg
-├─scene2 (root_dir for scene2)
-│   ├─patches *
-│   ├─descriptors *
-│   ├─keypoints *
-│   ├─matches *
-│   ├─sparse *
-│   │   └─0 *
-│   ├─image-pairs.txt *
-│   ├─database.db *
-│   ├─log.txt *
-│   ├─result.txt *
-│   └─img
-│      ├─img1.jpg
-│      ├─img2.jpg
-│      └─img3.jpg
-...
+workspace
+  ├─sparse  
+  │   └─0  
+  ├─image-pairs.txt  
+  ├─database.db  
+  ├─log.txt  
+  └─result.txt  
 ```
+## Result
+
+Fort_Channing_gate:
+
+![pic alt](../img/demo/Fort_Channing_gate.png "opt title")

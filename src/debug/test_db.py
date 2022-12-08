@@ -81,11 +81,7 @@ shutil.copyfile(src_db_file, db_file)
 
 con = sqlite3.connect(db_file)
 cur = con.cursor()
-# names = cur.execute("SELECT name FROM sqlite_master").fetchall()
-cams = get_all_items(cur, 'cameras')
-# imgs = get_all_items(cur, 'cameras')
-str = cams[0][4]
-print(cams[0])
-print(np.frombuffer(str, dtype=np.float64))
+res = cur.execute("SELECT rows,cols FROM matches;").fetchone()
+print(res)
 
 m = 0
