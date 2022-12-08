@@ -1,4 +1,6 @@
 pyrightconfig.json
 __pycache__/
 *.swp
-data/
+data/*
+!data/*.ps1
+!data/*.sh
