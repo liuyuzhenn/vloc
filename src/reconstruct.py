@@ -12,6 +12,7 @@ from recon.model import HyNet, SOSNet
 from recon.feature import *
 
 
+# TODO: time test
 def run(model, args):
     img_dir = args.img_dir
     work_space = args.work_space
@@ -58,7 +59,7 @@ def run(model, args):
             "prior_focal_length) VALUES(?, ?, ?, ?, ?, ?);", (image_id, cam_model, w, h, params.tobytes(), 1))
 
         # detect keypoints and extract descriptors
-        patches, kps = extract_patches(img)
+        patches, kps = extract_patches(img,max_kps=args.max_kps)
         if patches.shape[0] > 0:
             descs = extract_desc(model, patches, batch_size, device)
         else:
@@ -88,10 +89,10 @@ def run(model, args):
         for image_name1, image_name2 in image_pairs:
             fid.write("{} {}\n".format(image_name1, image_name2))
 
-    colmap_pipline(colmap_path, db_file, work_space, threads)
+    colmap_pipline(colmap_path, img_dir, db_file, work_space, threads)
 
 
-def colmap_pipline(colmap_path, db_file, work_space, threads):
+def colmap_pipline(colmap_path, img_dir, db_file, work_space, threads):
     ###############################
     # Verify geometry
     ###############################
@@ -106,7 +107,7 @@ def colmap_pipline(colmap_path, db_file, work_space, threads):
     if not os.path.isdir(sparse):
         os.makedirs(sparse)
     cmd = r'{} mapper --database_path {}  --image_path {} --output_path {} --Mapper.num_threads {} > {}'\
-        .format(colmap_path, db_file, work_space, sparse, threads,
+        .format(colmap_path, db_file, img_dir, sparse, threads,
                 os.path.join(work_space, 'log.txt'))
     os.system(cmd)
 
@@ -220,6 +221,8 @@ if __name__ == "__main__":
                         help='Matching block size')
     parser.add_argument('--prior_focal_length', type=float, default=1.2,
                         help='Prior focal length')
+    parser.add_argument('--max_kps', type=int, default=10000,
+                        help='Maximum number of keypoints per image')
     args = parser.parse_args()
 
     device = 'cpu' if args.device < 0 else 'cuda:'+str(args.device)
