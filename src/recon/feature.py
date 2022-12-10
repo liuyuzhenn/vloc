@@ -14,13 +14,13 @@ import numpy as np
 import cv2
 
 
-def extract_patches(img, factor=5):
+def extract_patches(img, factor=5, max_kps=10000):
     dst_sz = 32
     c = dst_sz//2
     dst_sz_ = int(dst_sz*1.5)
     c_ = dst_sz_//2
 
-    sift = cv2.SIFT_create()
+    sift = cv2.SIFT_create(nfeatures=max_kps)
 
     h, w = img.shape
     kps = sift.detect(img, None)

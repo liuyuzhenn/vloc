@@ -2,6 +2,8 @@ import sqlite3
 import os
 import shutil
 import numpy as np
+import sys
+from recon.database import DatabaseOperator
 
 
 def get_all_items(cur, s):
@@ -73,15 +75,10 @@ def create_tables(cur):
                 """)
 
 
-root_dir = 'C:/Users/23792/Desktop'
-src_db_file = os.path.join(root_dir, 'test.db')
-db_file = os.path.join('.', 'test.db')
-# os.remove(db_file)
-shutil.copyfile(src_db_file, db_file)
-
-con = sqlite3.connect(db_file)
-cur = con.cursor()
-res = cur.execute("SELECT rows,cols FROM matches;").fetchone()
-print(res)
+db = DatabaseOperator('../out.db')
+descriptors = db.fetch_all_descriptors()
+keypoints = db.fetch_all_keypoints()
+# print(descriptors[:2])
+print(keypoints[0][1])
 
 m = 0

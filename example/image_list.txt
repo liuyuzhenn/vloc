@@ -1,0 +1,6 @@
+data\Fort_Channing_gate\img\DSC_0158.JPG
+data\Fort_Channing_gate\img\DSC_0162.JPG
+data\Buddah_tooth_relic_temple\img\DSC_0321.JPG
+data\Buddah_tooth_relic_temple\img\DSC_0351.JPG
+data\kronan\img\DSC_0004.JPG
+data\kronan\img\DSC_0021.JPG
