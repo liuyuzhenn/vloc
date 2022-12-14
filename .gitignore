@@ -5,3 +5,4 @@ __pycache__/
 data/*
 !*.ps1
 !*.sh
+!*.npy
