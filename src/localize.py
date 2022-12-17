@@ -72,14 +72,22 @@ def main(args):
     # pass zero if image distortion information is not available
     dist_coeff = np.zeros([4], dtype=np.float32)
 
+
     ############################################################
     # extract features
     ############################################################
     t1 = time.time()
     patches, kps = extract_patches(img, max_kps=10000)
     t2 = time.time()
-    print('Feature extraction time cost is {:.1f} ms'.format((t2-t1)*1000))
+
+    for _ in range(4):
+        descs = extract_desc(model_desc, patches, 512, device)
+
+    t3 = time.time()
     descs = extract_desc(model_desc, patches, 512, device)
+    t4 = time.time()
+    print('Patches extraction time cost is {:.1f} ms'.format((t2-t1)*1000))
+    print('Descriptor extraction time cost is {:.1f} ms'.format((t4-t3)*1000))
 
     ############################################################
     # localize
