@@ -3,7 +3,7 @@
 ## Environment
 
 ```sh
-conda create --name vloc --file ./requirements.txt
+conda env create -f vloc.yml
 ```
 
 ## Download Data
