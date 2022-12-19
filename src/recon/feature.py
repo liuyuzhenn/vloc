@@ -22,7 +22,7 @@ def extract_patches(img, factor=5, max_kps=10000):
 
     sift = cv2.SIFT_create(nfeatures=max_kps)
 
-    h, w = img.shape
+    h, w = img.shape[:2]
     kps = sift.detect(img, None)
     pts = []
     patches = []

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import cv2
 from loc.model3d import Model3D
 from loc.utils import *
@@ -26,7 +27,7 @@ def cluster_model3d(clusters: np.ndarray, model3d: Model3D) -> dict:
     return res
 
 
-def localize(keypoints: np.ndarray, descriptors: np.ndarray,
+def localize(keypoints: torch.tensor, descriptors: torch.tensor,
              camera_matrix: np.ndarray, dist_coeff: np.ndarray,
              clusters: np.ndarray, dict_clusterid_points3d: dict,
              num_kps: int = 1000, ratio: float = 0.9,
@@ -50,8 +51,17 @@ def localize(keypoints: np.ndarray, descriptors: np.ndarray,
 
     # the main time cost comes from here:
     # find the corresponding visual words for each 2D keypoints
-    distance = compute_distance(descriptors, clusters)
-    inds = np.argmin(distance, axis=1)
+    # distance = compute_distance(descriptors, clusters)
+    if type(descriptors)==np.ndarray:
+        descriptors = torch.from_numpy(descriptors)
+    if type(clusters)==np.ndarray:
+        clusters = torch.from_numpy(clusters)
+    
+    distance = torch.cdist(descriptors, clusters)
+    inds = torch.argmin(distance, axis=1).numpy()
+    
+    # convert back to numpy for knn math in cv2
+    descriptors = descriptors.numpy()
 
     # retrieve all 3D points in the same visual word
     # (kp_id, points3d, descriptors)
@@ -85,7 +95,6 @@ def localize(keypoints: np.ndarray, descriptors: np.ndarray,
     success, rvec, tvec, inliers = cv2.solvePnPRansac(obj_points.reshape(-1, 1, 3), img_points.reshape(-1, 1, 2),
                                                       camera_matrix, dist_coeff, reprojectionError=ransac_reproj_err,
                                                       confidence=ransac_conf, iterationsCount=ransac_iters)
-
     # R = cv2.Rodrigues(rvec) # angle axis -> rotation matrix
 
-    return success, rvec, tvec, 0 if not success else len(inliers)
+    return success, rvec, tvec, 0 if not success else len(inliers), len(obj_points)

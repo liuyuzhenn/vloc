@@ -6,7 +6,6 @@ def compute_dist(a, b):
         np.sum(b**2, axis=1, keepdims=True).T - 2 * a@b.T
     return distance
 
-
 def kmeans(x, k, iterations=1000, eps=1e-3):
     n, d = x.shape
     clusters = x[np.random.choice(n, k, False)]

@@ -1,5 +1,8 @@
 # Instruction
 
+- Reconstruction
+- Localization
+
 ## Reconstruction
 
 ### Usage
@@ -15,15 +18,26 @@ python src/reconstruct.py --colmap_path "E:/software/COLMAP-3.7-windows-cuda/COL
 
 During reconstruction, the following files will be generated `database.db`, `image-pairs.txt`, `log.txt`, `result.txt`
 
-Once the reconstruction is done, the structure looks like this (* denotes the generated folders/files): 
+Once the reconstruction is done, the structure looks like this:
 ```
-workspace
-  ├─sparse  
-  │   └─0  
-  ├─image-pairs.txt  
-  ├─database.db  
-  ├─log.txt  
-  └─result.txt  
+Fort_Channing_gate
+├── image-pairs.txt
+├── img
+│   ├── DSC_0158.JPG
+│   ├── DSC_0159.JPG
+│   ├── DSC_0160.JPG
+│   ├── DSC_0161.JPG
+│   ├── DSC_0162.JPG
+│   ....
+├── log.txt
+├── result.txt
+├── database.db
+└── sparse
+    └── 0
+        ├── cameras.txt
+        ├── images.txt
+        ├── points3D.txt
+        └── project.ini
 ```
 ### Result
 
@@ -31,34 +45,10 @@ Fort_Channing_gate:
 
 ![pic alt](../img/demo/Fort_Channing_gate.png "opt title")
 
-## Extract Features
-
-### Usage
-
-```ps
-python src/gen_desc.py --database /path/to/output_file --img_list /path/to/image_list
-```
-
-*e.g.*
-```ps
-python src/gen_desc.py --database "./database.db" --img_list "./example/image_list.txt"
-```
-
-After features are extracted, use the `DatabaseOperator` class to load descriptor/keypoints to memory, *e.g.*
-
-```py
-db = DatabaseOperator('database.db')
-descriptors = DatabaseOperator.fetch_all_descriptors() # load descriptors
-keypoints = DatabaseOperator.fetch_all_keypoints() # load keypoints
-```
-
-Refer to `DatabaseOperator` in `database.py` for further details.
 
 ## Localization
 
-Localize image given a 3D model.
-
-To localize an image, you shold:
+The following steps are needed to localize an image:
 - Preprocess (this procedure only needs to be excecuted once for each 3D model).
 	- Load 3D model using `Model3D` class.
 	- Call function `cluster_model3d` to classify model descriptors.
@@ -68,14 +58,27 @@ To localize an image, you shold:
 	- `rvec`: rotation vector
 	- `tvec`: translation vector
 	- `inliers`: number of inliers used for PnP
+	- `corrs_total`: number of total correspondences used in PnP
 
 
 An example could be found in file `localize.py`.
 
-
 ### Usage
 
+
+- First extract features to a database file:
 ```ps
-python src/localize.py --database /path/to/database --model_dir /path/to/model3d --img_path /path/to/image --num_kps 1000
+python src/gen_desc.py --database /path/to/database --img_list /path/to/image_list --desc_type "alike"
 ```
-Please refer to `--help` for further details.
+
+- Generate the visual words using kmeans:
+```ps
+python src/clusters.py --database /path/to/database --output /path/to/output_file(.npy)  --num_clusters number_of_clusters
+```
+
+- Localize:
+
+```ps
+python src/localize.py --database /path/to/database --model_dir /path/to/model3d --img_path /path/to/image --match_num_kps 5000
+```
+Please refer to `--help` for detailed controls.
