@@ -46,6 +46,8 @@ def main(args):
 
     model.eval()
 
+    if not os.path.isdir(work_space):
+        os.makedirs(work_space)
     db_file = os.path.join(work_space, 'database.db')
     db = DatabaseOperator(db_file)
     db.create_tables()

@@ -1,4 +1,4 @@
-# Instruction
+# Visual Localization
 
 - Reconstruction
 - Localization
@@ -6,6 +6,10 @@
 ## Reconstruction
 
 ### Usage
+
+- colmap_path: path of colmap
+- work_space: path of the folder to place the output
+- img_dir: path of the folder folder containing all images
 
 ```ps
 python src/reconstruct.py --colmap_path /path/to/colmap --work_space /path/to/work_space --img_dir /path/to/image_folder
