@@ -2,13 +2,13 @@
 
 ## Environment
 
-```sh
+```shell
 conda env create -f vloc.yml
 ```
 
 ## Download Data
 
-```sh
+```shell
 cd data && ./download.ps1
 ```
 
@@ -25,12 +25,12 @@ cd data && ./download.ps1
 - work_space: path of the folder to place the output
 - img_dir: path of the folder folder containing all images
 
-```ps
+```shell
 python src/reconstruct.py --colmap_path /path/to/colmap --work_space /path/to/work_space --img_dir /path/to/image_folder
 ```
 *e.g.*
 
-```ps
+```shell
 python src/reconstruct.py --colmap_path "E:/software/COLMAP-3.7-windows-cuda/COLMAP.bat" --work_space "data/Fort_Channing_gate"  --img_dir  "data/Fort_Channing_gate/img"
 ```
 
@@ -85,18 +85,18 @@ An example could be found in file `localize.py`.
 
 
 - First extract features to a database file:
-```ps
+```shell
 python src/gen_desc.py --database /path/to/database --img_list /path/to/image_list --desc_type "alike"
 ```
 
 - Generate the visual words using kmeans:
-```ps
+```shell
 python src/clusters.py --database /path/to/database --output /path/to/output_file(.npy)  --num_clusters number_of_clusters
 ```
 
 - Localize:
 
-```ps
+```shell
 python src/localize.py --database /path/to/database --model_dir /path/to/model3d --img_path /path/to/image --match_num_kps 5000
 ```
 Please refer to `--help` for detailed controls.
