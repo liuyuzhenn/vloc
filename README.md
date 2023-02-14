@@ -11,19 +11,13 @@ conda env create -f vloc.yml
 ```shell
 cd data && ./download.ps1
 ```
-
-## Instruction
-
-- Reconstruction
-- Localization
-
 ## Reconstruction
 
 ### Usage
 
 - colmap_path: path of colmap
 - work_space: path of the folder to place the output
-- img_dir: path of the folder folder containing all images
+- img_dir: path of the folder containing all images
 
 ```shell
 python src/reconstruct.py --colmap_path /path/to/colmap --work_space /path/to/work_space --img_dir /path/to/image_folder
