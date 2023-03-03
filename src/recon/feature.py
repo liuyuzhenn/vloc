@@ -3,7 +3,7 @@ File: feature.py
 Author: liuyuzhen
 Email: liuyuzhen22@mails.ucas.ac.cn
 Github: https://github.com/liuyuzhenn
-Description: 
+Description:
 """
 
 from math import ceil
@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import torch
 import numpy as np
+import time
 import cv2
 
 
@@ -67,7 +68,7 @@ def match_all_desc(connection, block_size, device, show_status=True):
     num_files = len(img_id_name)
     num_blocks = ceil(num_files/block_size)
     image_pairs = []
-    image_pair_ids = []
+    t1 = time.time()
     for block_idx1 in range(num_blocks):
         start_idx1 = block_idx1*block_size
         end_idx1 = min((block_idx1+1)*block_size, num_files)
@@ -100,23 +101,24 @@ def match_all_desc(connection, block_size, device, show_status=True):
 
             for idx1 in range(start_idx1, end_idx1):
                 for idx2 in range(start_idx2, end_idx2):
-                    if idx1 < idx2:
-                        idx1_ = idx1
-                        idx2_ = idx2
-                    elif idx1 > idx2:
-                        idx2_ = idx1
-                        idx1_ = idx2
-                    else:
+                    i = idx1 - start_idx1
+                    j = idx2 - start_idx2
+                    if block_idx1 <= block_idx2:  # above the block diagonal
+                        if i <= j:
+                            continue
+                    elif i < j:  # below the block diagonal
                         continue
+
+                    if idx1 > idx2:
+                        idx1_, idx2_ = idx2, idx1
+                    else:
+                        idx1_, idx2_ = idx1, idx2
 
                     image_id1, name1 = img_id_name[idx1_]
                     image_id2, name2 = img_id_name[idx2_]
                     image_pair_id = image_ids_to_pair_id(image_id1, image_id2)
-                    if image_pair_id in image_pair_ids:
-                        continue
-                    else:
-                        image_pairs.append((name1, name2))
-                        image_pair_ids.append(image_pair_id)
+
+                    image_pairs.append((name1, name2))
 
                     descs1 = descs_all[image_id1]
                     descs2 = descs_all[image_id2]
@@ -127,7 +129,9 @@ def match_all_desc(connection, block_size, device, show_status=True):
                                    "VALUES(?, ?, ?, ?);",
                                    (image_pair_id, matches.shape[0], matches.shape[1],
                                     matches_str))
-                    connection.commit()
+            connection.commit()
+    t2 = time.time()
+    print('Matching time cost is {:.4f}s'.format(t2-t1))
     return image_pairs
 
 
@@ -148,4 +152,3 @@ def image_ids_to_pair_id(image_id1, image_id2):
         return 2147483647 * image_id2 + image_id1
     else:
         return 2147483647 * image_id1 + image_id2
-
