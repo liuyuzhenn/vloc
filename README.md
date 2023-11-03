@@ -61,7 +61,7 @@ Fort_Channing_gate:
 ## Localization
 
 The following steps are needed to localize an image:
-- Preprocess (this procedure only needs to be excecuted once for each 3D model).
+- Preprocess (this procedure only needs to be executed once for each 3D model).
 	- Load 3D model using `Model3D` class.
 	- Call function `cluster_model3d` to classify model descriptors.
 - Extract keypoints/descriptors from the image.

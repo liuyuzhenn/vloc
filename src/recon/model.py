@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 from torchvision.models import resnet
 from copy import deepcopy
+import sys
+sys.path.append('.')
+from methods.SuperGluePretrainedNetwork.models.superpoint import SuperPoint
 import cv2
 import math
 import os
@@ -674,3 +677,16 @@ class ALike(ALNet):
                 'scores': scores.cpu().numpy(),
                 'scores_map': scores_map.cpu().numpy(),
                 }
+
+
+class SuperPointModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = SuperPoint(SuperPoint.default_config).eval()
+
+    def forward(self, img):
+        img = img.unsqueeze(0).unsqueeze(0)
+        out_sp = self.model({'image': img})
+        pts = out_sp['keypoints'][0].cpu().numpy()
+        descs = out_sp['descriptors'][0].cpu().numpy().T
+        return pts, descs

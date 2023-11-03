@@ -5,7 +5,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 import argparse
-from recon.model import HyNet, SOSNet, ALike, configs as alike_cfg
+from recon.model import HyNet, SOSNet, ALike, SuperPointModel, configs as alike_cfg
 from recon.feature import *
 from recon.database import DatabaseOperator
 
@@ -41,6 +41,8 @@ def main(args):
                       top_k=0,
                       scores_th=args.scores_th,
                       n_limit=args.max_kps)
+    elif desc_type == 'superpoint':
+        model = SuperPointModel().to(device)
     else:
         raise NotImplementedError
 
@@ -51,13 +53,20 @@ def main(args):
     db_file = os.path.join(work_space, 'database.db')
     db = DatabaseOperator(db_file)
     db.create_tables()
-    db.clear_tables()
+
+    if args.overwrite:
+        db.clear_tables()
 
     imgs = os.listdir(img_dir)
     imgs.sort()
     bar = tqdm(range(1, len(imgs)+1), desc='Extract features')
     for image_id in bar:
         image_name = imgs[image_id-1]
+        db.cursor.execute(
+            "SELECT rows,cols,data FROM descriptors WHERE image_id={};".format(image_id))
+        if db.cursor.rowcount > 0:
+            continue
+
         # get image width, height
         img = cv2.imread(os.path.join(img_dir, image_name))
         h, w = img.shape[:2]
@@ -80,6 +89,11 @@ def main(args):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             ans = model(img)
             kps, descs = ans['keypoints'], ans['descriptors']
+        elif desc_type == 'superpoint':
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)/255
+            img = torch.from_numpy(img).float().to(device)
+            with torch.no_grad():
+                kps, descs = model(img)
         else:
             raise NotImplementedError
 
@@ -88,7 +102,12 @@ def main(args):
         db.commit()
 
     # match
-    image_pairs = match_all_desc(db.connection, block_size, device)
+    if args.matching_mode=='sequential':
+        image_pairs = sequential_match_all_desc(db.connection, args.overlap, device)
+    elif args.matching_mode=='exhaustive':
+        image_pairs = exhaustive_match_all_desc(db.connection, block_size, device)
+    else:
+        raise NotImplementedError
 
     with open(os.path.join(work_space, "image-pairs.txt"), "w") as fid:
         for image_name1, image_name2 in image_pairs:
@@ -161,7 +180,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_type', type=str, default='TXT',
                         help='BIN, TXT, NVM, Bundler, VRML, PLY, R3D, CAM')
     parser.add_argument('--desc_type', type=str, default='alike',
-                        help='SOSNet | HyNet | ALIKE')
+                        help='SOSNet | HyNet | ALIKE | SuperPoint')
     parser.add_argument('--batch_size', type=int, default=512,
                         help='Batch size when computing decriptors')
     parser.add_argument('--block_size', type=int, default=50,
@@ -174,6 +193,12 @@ if __name__ == "__main__":
                         help='Detector score threshold (default: 0.15).')
     parser.add_argument('--alike_type', type=str, default='alike-t',
                         help='alike-t | alike-s | alike-n | alike-l')
+    parser.add_argument('--matching_mode', type=str, default='exhaustive',
+                        help='exhaustive | sequential')
+    parser.add_argument('--overlap', type=int, default=50,
+                        help='overlap images in exhaustive matching mode')
+    parser.add_argument('--overwrite', type=bool, default=False,
+                        help='continue')
     args = parser.parse_args()
 
     output_type = args.output_type

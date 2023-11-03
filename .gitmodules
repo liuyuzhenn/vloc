@@ -1,0 +1,3 @@
+[submodule "methods/SuperGluePretrainedNetwork"]
+	path = methods/SuperGluePretrainedNetwork
+	url = git@github.com:magicleap/SuperGluePretrainedNetwork.git

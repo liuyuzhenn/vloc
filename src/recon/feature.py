@@ -61,7 +61,7 @@ def extract_desc(model, patches, batch_size, device):
     return features.numpy()
 
 
-def match_all_desc(connection, block_size, device, show_status=True):
+def exhaustive_match_all_desc(connection, block_size, device, show_status=True, overwrite=False):
     cursor = connection.cursor()
     img_id_name = cursor.execute(
         "SELECT image_id, name FROM images;").fetchall()
@@ -117,8 +117,12 @@ def match_all_desc(connection, block_size, device, show_status=True):
                     image_id1, name1 = img_id_name[idx1_]
                     image_id2, name2 = img_id_name[idx2_]
                     image_pair_id = image_ids_to_pair_id(image_id1, image_id2)
-
                     image_pairs.append((name1, name2))
+                    cursor.execute(
+                        "SELECT * FROM matches WHERE pair_id={};".format(image_pair_id))
+                    if cursor.rowcount > 0:
+                        continue
+
 
                     descs1 = descs_all[image_id1]
                     descs2 = descs_all[image_id2]
@@ -134,6 +138,65 @@ def match_all_desc(connection, block_size, device, show_status=True):
     print('Matching time cost is {:.4f}s'.format(t2-t1))
     return image_pairs
 
+def sequential_match_all_desc(connection, overlap, device, show_status=True, overwrite=False):
+    cursor = connection.cursor()
+    if overwrite:
+        cursor.execute("DELETE FROM matches;")
+    connection.commit()
+    img_id_name = cursor.execute(
+        "SELECT image_id, name FROM images;").fetchall()
+    num_images = len(img_id_name)
+    image_pairs = []
+    t1 = time.time()
+
+    # Load descriptors
+    descs_all = {}
+    for idx1 in range(num_images):
+        if show_status:
+            print('Matching [{}/{}]'.format(idx1+1, num_images))
+        image_id1, name1 = img_id_name[idx1]
+
+        if image_id1 not in descs_all:
+            rows, cols, data = cursor.execute(
+                "SELECT rows,cols,data FROM descriptors WHERE image_id={};".format(image_id1)).fetchone()
+            desc = np.frombuffer(
+                data, dtype=np.float32).reshape((rows, cols))
+            descs_all[image_id1] = desc
+        descs1 = descs_all[image_id1]
+        for idx2 in range(idx1+1, idx1+overlap+1):
+            if idx2 >= num_images: break
+
+            image_id2, name2 = img_id_name[idx2]
+
+            image_pair_id = image_ids_to_pair_id(image_id1, image_id2)
+            image_pairs.append((name1, name2))
+            cursor.execute(
+                "SELECT * FROM matches WHERE pair_id={};".format(image_pair_id))
+            if cursor.rowcount > 0:
+                continue
+
+            if image_id2 not in descs_all:
+                rows, cols, data = cursor.execute(
+                    "SELECT rows,cols,data FROM descriptors WHERE image_id={};".format(image_id2)).fetchone()
+                desc = np.frombuffer(
+                    data, dtype=np.float32).reshape((rows, cols))
+                descs_all[image_id2] = desc
+            
+
+            descs2 = descs_all[image_id2]
+            descs1 = descs_all[image_id1]
+            descs2 = descs_all[image_id2]
+            matches = match(descs1, descs2, device)
+            matches_str = matches.tobytes()
+            cursor.execute("INSERT INTO  matches(pair_id, rows, cols, data) " +
+                           "VALUES(?, ?, ?, ?);",
+                           (image_pair_id, matches.shape[0], matches.shape[1],
+                            matches_str))
+        connection.commit()
+
+    t2 = time.time()
+    print('Matching time cost is {:.4f}s'.format(t2-t1))
+    return image_pairs
 
 def match(descs1, descs2, device):
     descs1 = torch.from_numpy(descs1.copy()).float().to(device)

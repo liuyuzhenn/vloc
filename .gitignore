@@ -1,6 +1,8 @@
 pyrightconfig.json
 .vscode/
 __pycache__/
+experiments/
+experiment/
 *.swp
 *.db
 data/*
