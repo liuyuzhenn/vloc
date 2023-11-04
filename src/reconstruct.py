@@ -4,10 +4,15 @@ import torch
 import os
 import numpy as np
 from tqdm import tqdm
+from torchvision import transforms
 import argparse
 from recon.model import HyNet, SOSNet, ALike, SuperPointModel, configs as alike_cfg
 from recon.feature import *
 from recon.database import DatabaseOperator
+import sys
+sys.path.append('./methods/SOLAR/')
+from methods.SOLAR.solar_global.utils.networks import load_network
+from methods.SuperGluePretrainedNetwork.models.matching import Matching
 
 
 def main(args):
@@ -18,7 +23,6 @@ def main(args):
     prior_focal_length = args.prior_focal_length
     batch_size = args.batch_size
     device = 'cpu' if args.device < 0 else 'cuda:'+str(args.device)
-    desc_type = args.desc_type
     block_size = args.block_size
     colmap_path = args.colmap_path
     threads = args.threads
@@ -42,7 +46,15 @@ def main(args):
                       scores_th=args.scores_th,
                       n_limit=args.max_kps)
     elif desc_type == 'superpoint':
-        model = SuperPointModel().to(device)
+        dic = {
+            'descriptor_dim': 256,
+            'nms_radius': 4,
+            'keypoint_threshold': 0.005,
+            'max_keypoints': args.max_kps,
+            'remove_borders': 4,
+        }
+
+        model = SuperPointModel(dic).to(device)
     else:
         raise NotImplementedError
 
@@ -53,31 +65,68 @@ def main(args):
     db_file = os.path.join(work_space, 'database.db')
     db = DatabaseOperator(db_file)
     db.create_tables()
-
     if args.overwrite:
         db.clear_tables()
+
+    # match
+    matcher = None
+    if args.matcher == 'superglue':
+        dic = {
+            'superglue': {'weights': args.matcher_weight},
+        }
+        matcher = Matching(dic).to('cuda')
+
+
+    if args.matching_mode == 'sequential':
+        MODEL = 'resnet101-solar-best.pth'
+        IMG_SIZE = 1000
+
+        retrieval_model = load_network(MODEL)
+        retrieval_model.eval()
+        retrieval_model.cuda()
+
+            # set up the transform
+        normalize = transforms.Normalize(
+            mean=retrieval_model.meta['mean'],
+            std=retrieval_model.meta['std']
+        )
+        resize = transforms.Resize(IMG_SIZE)
+
 
     imgs = os.listdir(img_dir)
     imgs.sort()
     bar = tqdm(range(1, len(imgs)+1), desc='Extract features')
+    h, w = None, None
     for image_id in bar:
-        image_name = imgs[image_id-1]
-        db.cursor.execute(
-            "SELECT rows,cols,data FROM descriptors WHERE image_id={};".format(image_id))
-        if db.cursor.rowcount > 0:
+        ret = db.cursor.execute(
+            "SELECT * FROM descriptors WHERE image_id={};".format(image_id)).fetchone()
+        if ret is not None:
             continue
+        image_name = imgs[image_id-1]
 
-        # get image width, height
+        ##############
+        # load image #
+        ##############
         img = cv2.imread(os.path.join(img_dir, image_name))
         h, w = img.shape[:2]
-        params = np.array([prior_focal_length*max(h, w), w/2, h/2, 0],
-                          dtype=np.float64)  # (f,cx,cy,k)
-        camera_model = 2  # 0: simple pinhole, 1: pinhole 2: simple radial
+    
+        if not args.share_intrinsics:
+            db.insert_image(image_id, image_name, image_id)
+            params = np.array([prior_focal_length*max(h, w), w/2, h/2, 0],
+                              dtype=np.float64)  # (f,cx,cy,k)
+            camera_model = 2  # 0: simple pinhole, 1: pinhole 2: simple radial
+            db.insert_camera(image_id, camera_model, w, h, params.tobytes())
+        else:
+            db.insert_image(image_id, image_name, 1)
+            if image_id==1:
+                params = np.array([prior_focal_length*max(h, w), w/2, h/2, 0],
+                                  dtype=np.float64)  # (f,cx,cy,k)
+                camera_model = 2  # 0: simple pinhole, 1: pinhole 2: simple radial
+                db.insert_camera(1, camera_model, w, h, params.tobytes())
 
-        db.insert_image(image_id, image_name, image_id)
-        db.insert_camera(image_id, camera_model, w, h, params.tobytes())
-        # detect keypoints and extract descriptors
-
+        #########################
+        # extract local feature #
+        #########################
         if desc_type == 'sosnet' or desc_type == 'hynet':
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             patches, kps = extract_patches(img, max_kps=args.max_kps)
@@ -86,26 +135,52 @@ def main(args):
             else:
                 descs = np.array([], np.float32)
         elif desc_type == 'alike':
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            ans = model(img)
+            img_ = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            ans = model(img_)
             kps, descs = ans['keypoints'], ans['descriptors']
         elif desc_type == 'superpoint':
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)/255
-            img = torch.from_numpy(img).float().to(device)
+            img_ = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)/255
+            img_ = torch.from_numpy(img_).float().to(device)
             with torch.no_grad():
-                kps, descs = model(img)
+                kps, descs, scores = model(img_)
+
+            scores_ = np.stack([scores, np.zeros_like(scores)], axis=1)
+            kps = np.concatenate([kps, scores_], axis=1)
+
         else:
             raise NotImplementedError
 
+        ####################################################
+        # extract global feature if using sequential match #
+        ####################################################
+        if args.matching_mode=='sequential':
+            img_ts = torch.from_numpy(cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)).cuda().permute(2,0,1)
+            img_ts = normalize(img_ts).unsqueeze(0)
+            img_ts = resize(img_ts)
+            with torch.no_grad():
+                desc_g = retrieval_model(img_ts)[0].cpu().numpy()
+            db.insert_descriptors_g(image_id, desc_g)
+
+        
+        ###########################
+        # save data into database #
+        ###########################
         db.insert_keypoints(image_id, kps)
         db.insert_descriptors(image_id, descs)
         db.commit()
-
-    # match
+    
     if args.matching_mode=='sequential':
-        image_pairs = sequential_match_all_desc(db.connection, args.overlap, device)
-    elif args.matching_mode=='exhaustive':
-        image_pairs = exhaustive_match_all_desc(db.connection, block_size, device)
+        del retrieval_model
+    
+
+    if args.matching_mode == 'sequential':
+        image_pairs = sequential_match_all_desc(
+            db.connection, args.overlap, device, matcher=matcher, shape=[h, w], 
+            loop_detection_period=args.loop_detection_period,
+            loop_detection_num_images=args.loop_detection_num_images)
+    elif args.matching_mode == 'exhaustive':
+        image_pairs = exhaustive_match_all_desc(
+            db.connection, block_size, device, matcher=matcher, shape=[h, w])
     else:
         raise NotImplementedError
 
@@ -174,7 +249,7 @@ if __name__ == "__main__":
     # optional
     ##################################################
     parser.add_argument('-t', '--threads', type=int,
-                        help='Number of threads', default=1)
+                        help='Number of threads', default=4)
     parser.add_argument('--device', type=int, default=0,
                         help='-1: CPU; others: GPU')
     parser.add_argument('--output_type', type=str, default='TXT',
@@ -187,7 +262,7 @@ if __name__ == "__main__":
                         help='Matching block size')
     parser.add_argument('--prior_focal_length', type=float, default=1.2,
                         help='Prior focal length')
-    parser.add_argument('--max_kps', type=int, default=10000,
+    parser.add_argument('--max_kps', type=int, default=8000,
                         help='Maximum number of keypoints per image')
     parser.add_argument('--scores_th', type=float, default=0.15,
                         help='Detector score threshold (default: 0.15).')
@@ -195,10 +270,18 @@ if __name__ == "__main__":
                         help='alike-t | alike-s | alike-n | alike-l')
     parser.add_argument('--matching_mode', type=str, default='exhaustive',
                         help='exhaustive | sequential')
-    parser.add_argument('--overlap', type=int, default=50,
+    parser.add_argument('--overlap', type=int, default=20,
                         help='overlap images in exhaustive matching mode')
-    parser.add_argument('--overwrite', type=bool, default=False,
-                        help='continue')
+    parser.add_argument('--overwrite', action='store_true', help='continue')
+    parser.add_argument('--share_intrinsics', action='store_true', help='continue')
+    parser.add_argument('--matcher', type=str, default='none',
+                        help='none | superglue')
+    parser.add_argument('--matcher_weight', type=str, default='outdoor',
+                        help='outdoor | indoor')
+    parser.add_argument('--loop_detection_period', type=int, default=50,
+                        help='every N-th image (loop_detection_period) is matched against its visually most similar images (loop_detection_num_images)')
+    parser.add_argument('--loop_detection_num_images', type=int, default=20,
+                        help='every N-th image (loop_detection_period) is matched against its visually most similar images (loop_detection_num_images)')
     args = parser.parse_args()
 
     output_type = args.output_type

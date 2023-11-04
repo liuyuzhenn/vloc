@@ -680,13 +680,14 @@ class ALike(ALNet):
 
 
 class SuperPointModel(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, dic) -> None:
         super().__init__()
-        self.model = SuperPoint(SuperPoint.default_config).eval()
+        self.model = SuperPoint(dic).eval()
 
     def forward(self, img):
         img = img.unsqueeze(0).unsqueeze(0)
         out_sp = self.model({'image': img})
         pts = out_sp['keypoints'][0].cpu().numpy()
         descs = out_sp['descriptors'][0].cpu().numpy().T
-        return pts, descs
+        scores = out_sp['scores'][0].cpu().numpy()
+        return pts, descs, scores

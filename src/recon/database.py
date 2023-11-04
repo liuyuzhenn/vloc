@@ -3,11 +3,12 @@ File: database.py
 Author: liuyuzhen
 Email: liuyuzhen22@mails.ucas.ac.cn
 Github: https://github.com/liuyuzhenn
-Description: 
+Description:
 """
 
 import sqlite3
 import numpy as np
+
 
 class DatabaseOperator(object):
     """
@@ -33,8 +34,22 @@ class DatabaseOperator(object):
         cursor.execute("DELETE FROM images;")
         cursor.execute("DELETE FROM keypoints;")
         cursor.execute("DELETE FROM descriptors;")
+        cursor.execute("DELETE FROM descriptors_g;")
         cursor.execute("DELETE FROM matches;")
         cursor.execute("DELETE FROM two_view_geometries;")
+        return True
+
+    def delete_tables(self):
+        """Set all tables to empty
+        """
+        cursor = self.connection.cursor()
+        cursor.execute("DROP TABLE cameras;")
+        cursor.execute("DROP TABLE images;")
+        cursor.execute("DROP TABLE keypoints;")
+        cursor.execute("DROP TABLE descriptors;")
+        cursor.execute("DROP TABLE descriptors_g;")
+        cursor.execute("DROP TABLE matches;")
+        cursor.execute("DROP TABLE two_view_geometries;")
         return True
 
     def create_tables(self):
@@ -43,6 +58,7 @@ class DatabaseOperator(object):
             - images
             - keypoints
             - descriptors
+            - descriptors_g
             - matches
             - two_view_geometries
 
@@ -58,6 +74,7 @@ class DatabaseOperator(object):
               params               BLOB,
               prior_focal_length   INTEGER                             NOT NULL);
                     """)
+
         cursor.executescript("""
             CREATE TABLE IF NOT EXISTS images
              (image_id   INTEGER  PRIMARY KEY AUTOINCREMENT  NOT NULL,
@@ -74,6 +91,7 @@ class DatabaseOperator(object):
           FOREIGN KEY(camera_id) REFERENCES cameras(camera_id));
           CREATE UNIQUE INDEX IF NOT EXISTS index_name ON images(name);
           """)
+
         cursor.executescript("""
           CREATE TABLE IF NOT EXISTS keypoints
              (image_id  INTEGER  PRIMARY KEY  NOT NULL,
@@ -82,6 +100,7 @@ class DatabaseOperator(object):
               data      BLOB,
           FOREIGN KEY(image_id) REFERENCES images(image_id) ON DELETE CASCADE);
                     """)
+
         cursor.executescript("""
           CREATE TABLE IF NOT EXISTS descriptors
              (image_id  INTEGER  PRIMARY KEY  NOT NULL,
@@ -90,6 +109,15 @@ class DatabaseOperator(object):
               data      BLOB,
           FOREIGN KEY(image_id) REFERENCES images(image_id) ON DELETE CASCADE);
                     """)
+
+        cursor.executescript("""
+          CREATE TABLE IF NOT EXISTS descriptors_g
+             (image_id  INTEGER  PRIMARY KEY  NOT NULL,
+              dim      INTEGER               NOT NULL,
+              data      BLOB,
+          FOREIGN KEY(image_id) REFERENCES images(image_id) ON DELETE CASCADE);
+                    """)
+
         cursor.executescript("""
           CREATE TABLE IF NOT EXISTS matches
              (pair_id  INTEGER  PRIMARY KEY  NOT NULL,
@@ -97,6 +125,7 @@ class DatabaseOperator(object):
               cols     INTEGER               NOT NULL,
               data     BLOB);
                     """)
+
         cursor.executescript("""
             CREATE TABLE IF NOT EXISTS two_view_geometries
                (pair_id  INTEGER  PRIMARY KEY  NOT NULL,
@@ -156,6 +185,14 @@ class DatabaseOperator(object):
                        (image_id, descriptors.shape[0], descriptors.shape[1],
                         descriptors.tobytes()))
 
+    def insert_descriptors_g(self, image_id, descriptors):
+        cursor = self.connection.cursor()
+        descriptors = descriptors.astype(np.float32)
+        cursor.execute("INSERT INTO descriptors_g(image_id, dim, data) " +
+                       "VALUES(?, ?, ?);",
+                       (image_id, descriptors.shape[0],
+                        descriptors.tobytes()))
+
     ##############################
     # query
     ##############################
@@ -206,7 +243,8 @@ class DatabaseOperator(object):
         kps = []
         for item in res:
             image_id, rows, cols, data = item
-            kps.append((image_id, np.frombuffer(data, dtype=np.float32).reshape((rows, cols))[:,:2]))
+            kps.append((image_id, np.frombuffer(
+                data, dtype=np.float32).reshape((rows, cols))[:, :2]))
 
         return kps
 
@@ -222,7 +260,8 @@ class DatabaseOperator(object):
         descs = []
         for item in res:
             image_id, rows, cols, data = item
-            descs.append((image_id, np.frombuffer(data, dtype=np.float32).reshape((rows, cols))))
+            descs.append((image_id, np.frombuffer(
+                data, dtype=np.float32).reshape((rows, cols))))
 
         return descs
 

@@ -1,3 +1,6 @@
 [submodule "methods/SuperGluePretrainedNetwork"]
 	path = methods/SuperGluePretrainedNetwork
 	url = git@github.com:magicleap/SuperGluePretrainedNetwork.git
+[submodule "methods/SOLAR"]
+	path = methods/SOLAR
+	url = git@github.com:tonyngjichun/SOLAR.git
