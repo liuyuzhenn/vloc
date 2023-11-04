@@ -221,6 +221,10 @@ def sequential_match_all_desc(connection, overlap, device, show_status=True, ove
             kps2 = kps_all[image_id2]
             matches = match(descs1, kps1, descs2, kps2,
                             device, matcher, **kwargs)
+
+            if idx1 > idx2:
+                matches = np.ascontiguousarray(np.flip(matches, 1))
+
             matches_str = matches.tobytes()
             cursor.execute("INSERT INTO  matches(pair_id, rows, cols, data) " +
                            "VALUES(?, ?, ?, ?);",
@@ -265,12 +269,18 @@ def sequential_match_all_desc(connection, overlap, device, show_status=True, ove
                 "SELECT * FROM matches WHERE pair_id={};".format(image_pair_id)).fetchone()
             if ret is not None:
                 continue
+
+
             descs1 = descs_all[image_id1]
             descs2 = descs_all[image_id2]
             kps1 = kps_all[image_id1]
             kps2 = kps_all[image_id2]
             matches = match(descs1, kps1, descs2, kps2,
                             device, matcher, **kwargs)
+
+            if idx1 > idx2:
+                matches = np.ascontiguousarray(np.flip(matches, 1))
+
             matches_str = matches.tobytes()
             cursor.execute("INSERT INTO  matches(pair_id, rows, cols, data) " +
                            "VALUES(?, ?, ?, ?);",
