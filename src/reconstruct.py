@@ -187,9 +187,11 @@ def main(args):
     with open(os.path.join(work_space, "image-pairs.txt"), "w") as fid:
         for image_name1, image_name2 in image_pairs:
             fid.write("{} {}\n".format(image_name1, image_name2))
+    
+    if matcher is not None: del matcher
 
-    colmap_pipline(colmap_path, img_dir, db_file, work_space, threads)
     db.close()
+    colmap_pipline(colmap_path, img_dir, db_file, work_space, threads)
 
 
 def colmap_pipline(colmap_path, img_dir, db_file, work_space, threads):
